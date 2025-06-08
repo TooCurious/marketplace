@@ -1,4 +1,5 @@
 from asyncio import gather
+import logging
 
 import asyncpg
 import asyncio
@@ -122,16 +123,29 @@ async def query_products_concurrently(pool, queries):
     return await asyncio.gather(*queries)
 
 async def main():
-    async with asyncpg.create_pool(host='localhost',
-                                   port=5432,
-                                   user='postgres',
-                                   database='postgres',
-                                   password='postgres',
-                                   min_size=6,
-                                   max_size=6) as pool:
+    connection = await asyncpg.connect(host='127.0.0.1',
+                                       port=5432,
+                                       user='postgres',
+                                       database='postgres',
+                                       password='password')
 
-        await query_products_concurrently(pool, 1000)
-        await query_products_synchronously(pool, 1000)
+    try:
+        async with connection.transaction():
+            insert_brands = "INSERT INTO brand VALUES(9999, 'big_brand')"
+            await connection.execute(insert_brands)
+            await connection.execute(insert_brands)
+    except Exception:
+        logging.exception('Ошибка привыполнении транзакции')
+    finally:
+        query = """SELECT brand_name FROM brand
+            WHERE brand_name LIKE 'big_%' """
+
+        brands = await connection.fetch(query)
+        print(brands)
+
+
+
+    await connection.close()
 
 
 
